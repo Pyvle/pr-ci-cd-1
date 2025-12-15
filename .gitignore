@@ -1,0 +1,15 @@
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite*
+.env
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+coverage.xml

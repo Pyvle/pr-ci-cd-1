@@ -1,0 +1,71 @@
+
+name: media-service CI + Yandex Cloud (build, push, deploy serverless container)
+
+on:
+  push:
+    branches: ["master", "main"]
+    paths:
+      - "media-service/**"
+      - ".github/workflows/media-ci-yc.yml"
+  pull_request:
+    branches: ["master", "main"]
+    paths:
+      - "media-service/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r media-service/requirements.txt
+      - name: Run tests
+        run: |
+          cd media-service
+          pytest -q
+
+  build-and-push-to-yc:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to YC Registry
+        uses: docker/login-action@v3
+        with:
+          registry: cr.yandex
+          username: json_key
+          password: ${{ secrets.YC_KEYS }}
+
+      - name: Build & push to YC Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: ./media-service
+          file: ./media-service/Dockerfile
+          push: true
+          tags: |
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/media-service:latest
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/media-service:${{ github.sha }}
+
+  deploy:
+    name: Deploy serverless container
+    runs-on: ubuntu-latest
+    needs: [build-and-push-to-yc]
+    if: github.event_name == 'push'
+    steps:
+      - name: Deploy serverless container
+        uses: yc-actions/yc-sls-container-deploy@v1
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_KEYS }}
+          container-name: ${{ secrets.YC_CONTAINER_NAME }}
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+          revision-image-url: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/media-service:latest
+          revision-service-account-id: ${{ secrets.YC_SA_ID }}
+          revision-env: |
+            ADMIN_TOKEN=${{ secrets.ADMIN_TOKEN }}
