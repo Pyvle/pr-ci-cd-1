@@ -1,0 +1,19 @@
+services:
+  product-service:
+    build: ./services/product-service
+    ports: ["8001:8080"]
+  catalog-service:
+    build: ./services/catalog-service
+    ports: ["8002:8080"]
+  pricing-service:
+    build: ./services/pricing-service
+    ports: ["8003:8080"]
+  inventory-service:
+    build: ./services/inventory-service
+    ports: ["8004:8080"]
+  reviews-service:
+    build: ./services/reviews-service
+    ports: ["8005:8080"]
+  media-service:
+    build: ./services/media-service
+    ports: ["8006:8080"]

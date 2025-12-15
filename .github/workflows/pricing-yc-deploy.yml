@@ -1,0 +1,51 @@
+name: pricing-service -> YC Registry -> Serverless Containers
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "services/pricing-service/**"
+      - ".github/workflows/pricing-yc-deploy.yml"
+
+jobs:
+  build-and-push-to-yc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to YC Registry
+        uses: docker/login-action@v3
+        with:
+          registry: cr.yandex
+          username: json_key
+          password: ${{ secrets.YC_KEYS }}
+
+      - name: Build & Push image to YC Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/pricing-service
+          file: ./services/pricing-service/Dockerfile
+          push: true
+          tags: |
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/pricing-service:latest
+            cr.yandex/${{ secrets.YC_REGISTRY_ID }}/pricing-service:${{ github.sha }}
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [build-and-push-to-yc]
+    steps:
+      - name: Deploy serverless container
+        uses: yc-actions/yc-sls-container-deploy@v1
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_KEYS }}
+          container-name: ${{ secrets.YC_CONTAINER_NAME }}
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+          revision-image-url: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/pricing-service:latest
+          revision-service-account-id: ${{ secrets.YC_SA_ID }}
+          revision-env: |
+            PORT=8080

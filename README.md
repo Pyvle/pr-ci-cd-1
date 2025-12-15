@@ -1,71 +1,53 @@
+# ПР7 CI/CD — шаблон проекта под микросервисы (Товар/Каталог/Цена/Остаток/Отзывы/Медиа)
 
-# Два микросервиса по диаграммам + CI/CD (DockerHub и Yandex Cloud Serverless Containers)
+Этот проект — готовая заготовка, чтобы выполнить **Практическую работу №7 (CI/CD)** из методички.
 
-В репозитории 2 сервиса, сделанные по вашим диаграммам:
+## Что уже сделано в репозитории
+- 6 минимальных микросервисов (FastAPI) с `Dockerfile` и `requirements.txt`
+- GitHub Actions workflow, который **собирает и пушит ВСЕ сервисы в DockerHub**
+- Отдельный workflow, который **собирает pricing-service и деплоит в Yandex Serverless Containers** (через YC Container Registry)
 
-1) **reviews-service** — управление отзывами о товаре  
-2) **media-service** — управление медиа-объектами товара (изображения/видео)
+## 1) Как выполнить ПР7 (по методичке)
+Методичка требует:
+1) Для **одного** сервиса настроить CI + доставку в **DockerHub**.
+2) Для **второго** сервиса настроить CI + **развёртывание** в виде serverless-контейнера в Яндекс.Облаке.
 
-Оба сервиса — **FastAPI** + **SQLite**, запускаются в контейнерах.
+В этом шаблоне:
+- `product-service` и остальные сервисы пушатся в DockerHub
+- `pricing-service` деплоится в Serverless Containers (YC)
 
-## Структура
-```
-.
-├─ reviews-service/
-├─ media-service/
-└─ .github/workflows/
-```
+## 2) Подготовка DockerHub
+1. Создай аккаунт/репозитории в DockerHub (можно без предварительного создания репо — DockerHub создаст автоматически при push).
+2. В GitHub репозитории открой: **Settings → Secrets and variables → Actions → Secrets**
+3. Добавь секреты:
+   - `DOCKER_USERNAME`
+   - `DOCKER_PASSWORD`
 
-## Локальный запуск (без Docker)
-### reviews-service
+## 3) Подготовка Яндекс.Облака (YC)
+Нужно сделать то, что описано в методичке:
+1. Container Registry: создай/выбери реестр.
+2. Service Account: создай/выбери сервисный аккаунт и **создай авторизованный ключ** (json).
+3. Serverless Containers: создай serverless container. В методичке указано, что **имя контейнера должно начинаться с фамилии студента**.
+4. В GitHub Secrets добавь:
+   - `YC_KEYS` — содержимое json-ключа
+   - `YC_REGISTRY_ID` — id реестра
+   - `YC_FOLDER_ID` — id каталога
+   - `YC_SA_ID` — id сервисного аккаунта
+   - `YC_CONTAINER_NAME` — имя serverless container для pricing-service
+
+## 4) Проверка локально (не обязательно, но полезно)
 ```bash
-cd reviews-service
+cd services/product-service
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+uvicorn app.main:app --reload --port 8080
 ```
+Открой `http://localhost:8080/docs`.
 
-### media-service
-```bash
-cd media-service
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8081
-```
+## 5) Как запустить CI/CD
+1. Закоммить и запушь проект в GitHub.
+2. При пуше в `main/master` GitHub Actions:
+   - `dockerhub-all-services.yml` соберёт и отправит 6 образов в DockerHub.
+   - `pricing-yc-deploy.yml` соберёт pricing-service, загрузит образ в YC Registry и сделает deploy в Serverless Containers.
 
-## Запуск через Docker
-### reviews-service
-```bash
-docker build -t reviews-service:local ./reviews-service
-docker run -p 8080:8080 -e DATABASE_URL=sqlite:////data/reviews.db -v $(pwd)/data:/data reviews-service:local
-```
-
-### media-service
-```bash
-docker build -t media-service:local ./media-service
-docker run -p 8081:8081 -e DATABASE_URL=sqlite:////data/media.db -v $(pwd)/data:/data media-service:local
-```
-
-## Секреты GitHub Actions
-
-### 1) Workflow для DockerHub (reviews-service)
-В **Settings → Secrets and variables → Actions → Secrets** добавьте:
-- `DOCKER_USERNAME`
-- `DOCKER_PASSWORD`
-
-### 2) Workflow для Yandex Cloud (media-service)
-Добавьте:
-- `YC_KEYS` — содержимое файла ключей сервисного аккаунта (json)
-- `YC_REGISTRY_ID`
-- `YC_FOLDER_ID`
-- `YC_CONTAINER_NAME`
-- `YC_SA_ID`
-
-Опционально:
-- `ADMIN_TOKEN` — токен администратора (используется сервисами при проверке админ-эндпоинтов)
-
-## Эндпоинты (кратко)
-- У каждого сервиса есть `GET /health`.
-- Документация Swagger:
-  - reviews-service: `http://localhost:8080/docs`
-  - media-service: `http://localhost:8081/docs`
+> Если хочешь деплоить в YC не только pricing-service — просто клонируй workflow и поменяй имя сервиса/образ.
